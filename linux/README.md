@@ -17,7 +17,8 @@ can keep merging upstream without conflicts.
 
 ## Playing
 
-Download the AppImage from the latest **Linux AppImage** workflow run (Actions tab, Artifacts), then:
+Download the AppImage from the repository's **Releases**: **continuous** is always the latest build of `main`,
+and pushed `v*` tags get releases of their own. Then:
 
 ```sh
 chmod +x Mickey_Donald_Collection-*.AppImage
@@ -55,7 +56,9 @@ USE_SYSTEM_SDL=1 ./linux/appimage/build.sh   # with the system's libsdl2-dev ins
 ```
 
 GitHub Actions runs `build.sh` on every push and pull request (Ubuntu 22.04, so the AppImage runs on glibc 2.35 and
-newer), starts the AppImage headless as a smoke test, and uploads it as an artifact.
+newer), starts the AppImage headless as a smoke test, and uploads it as an artifact. A push to `main` also
+replaces the AppImage in the **continuous** pre-release; pushing a tag such as `v1.3-linux1` publishes a release
+under that name.
 
 ## Keeping up with upstream
 

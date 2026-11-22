@@ -1,11 +1,23 @@
-# Builds the Linux AppImage (linux/appimage/build.sh) on every push and pull request; download it from the run's
-# Artifacts. Built on Ubuntu 22.04 so the AppImage runs on distributions with glibc 2.35 or newer.
+# Builds the Linux AppImage (linux/appimage/build.sh) on every push and pull request, and publishes it:
+#   - a push to main: the "continuous" pre-release (always the latest build; the tag moves to that commit)
+#   - a pushed tag v*: a release of that name
+# Every run also keeps it in the run's Artifacts. Built on Ubuntu 22.04 so the AppImage runs on distributions with
+# glibc 2.35 or newer.
 name: Linux AppImage
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write   # (the releases)
+
+concurrency:
+  group: linux-appimage-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   appimage:
@@ -57,3 +69,35 @@ jobs:
           name: smoke-test-launcher
           path: smoke/launcher.png
           if-no-files-found: ignore
+
+      # main: replace the "continuous" pre-release's AppImage with this build's, and move its tag here.
+      # (a tag pushed with the workflow's own token doesn't start another run)
+      - name: Publish continuous release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f continuous "$GITHUB_SHA"
+          git push -f origin refs/tags/continuous
+          notes="The latest Linux build of main (commit ${GITHUB_SHA::7}), made automatically on every push.
+
+          \`chmod +x\` the AppImage and run it. Put the ROMs (zipped is fine) next to the AppImage or in a \`roms\` folder beside it. See [linux/README.md](https://github.com/$GITHUB_REPOSITORY/blob/main/linux/README.md)."
+          if gh release view continuous >/dev/null 2>&1; then
+            gh release edit continuous --prerelease --title "Linux AppImage (latest build)" --notes "$notes"
+            for a in $(gh release view continuous --json assets -q '.assets[].name'); do
+              gh release delete-asset continuous "$a" -y
+            done
+          else
+            gh release create continuous --prerelease --title "Linux AppImage (latest build)" --notes "$notes"
+          fi
+          gh release upload continuous dist/*.AppImage --clobber
+
+      # A pushed tag v*: a release of that name with the AppImage (created, or the AppImage replaced if it exists).
+      - name: Publish tagged release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --generate-notes
+          gh release upload "$tag" dist/*.AppImage --clobber
