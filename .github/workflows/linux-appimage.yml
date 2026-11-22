@@ -1,0 +1,59 @@
+# Builds the Linux AppImage (linux/appimage/build.sh) on every push and pull request; download it from the run's
+# Artifacts. Built on Ubuntu 22.04 so the AppImage runs on distributions with glibc 2.35 or newer.
+name: Linux AppImage
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config curl unzip file \
+            libgles-dev libegl-dev fonts-dejavu-core libegl-mesa0 libgl1-mesa-dri \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libpipewire-0.3-dev libpulse-dev libasound2-dev libudev-dev libdbus-1-dev
+
+      - name: Cache SDL2 build
+        uses: actions/cache@v4
+        with:
+          path: build/linux-sdl/install
+          key: sdl2-2.32.10-ubuntu-22.04-${{ hashFiles('linux/appimage/build.sh') }}
+
+      - name: Build AppImage
+        run: ./linux/appimage/build.sh
+
+      # Starts the packaged AppImage without a display (SDL's offscreen driver, Mesa's software OpenGL ES) and has
+      # its autotest take a picture of the launcher: the build fails if the game can't start or draw.
+      - name: Smoke test
+        run: |
+          printf '90 shot launcher\n100 quit\n' > "$RUNNER_TEMP/smoke.txt"
+          SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy XDG_DATA_HOME="$RUNNER_TEMP/xdg" \
+            timeout 120 dist/*.AppImage --appimage-extract-and-run \
+              --autotest "$RUNNER_TEMP/shots" "$RUNNER_TEMP/smoke.txt" --capture-size 1280x720
+          test -s "$RUNNER_TEMP/shots/launcher.png"
+          mkdir -p smoke && cp "$RUNNER_TEMP/shots/launcher.png" smoke/
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mickey_Donald_Collection-linux-x86_64
+          path: dist/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload smoke test screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-launcher
+          path: smoke/launcher.png
+          if-no-files-found: ignore

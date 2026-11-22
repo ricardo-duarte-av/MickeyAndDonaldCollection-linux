@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Mickey & Donald Collection
+GenericName=Mega Drive collection
+Comment=Castle of Illusion, QuackShot and World of Illusion, with widescreen and more
+Exec=DisneyClassics
+Icon=mickey-donald-collection
+Categories=Game;Emulator;
+StartupWMClass=mickey-donald-collection
+Terminal=false
