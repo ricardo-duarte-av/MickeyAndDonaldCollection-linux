@@ -1,6 +1,6 @@
 # Mickey & Donald Collection — PC Edition
 
-A Windows port of three Sega Mega Drive / Genesis classics, with a launcher, widescreen up to 21:9,
+A Windows, Android and Linux port of three Sega Mega Drive / Genesis classics, with a launcher, widescreen up to 21:9,
 modern display options, gamepad support, cheats, level select, save states, fast forward / rewind and a
 music player:
 
@@ -11,6 +11,10 @@ music player:
 The games themselves run from **your own copies of the original ROMs**. The port contains no game code or
 assets; it runs the ROMs on a built-in, from-scratch Mega Drive core, so they play exactly like the
 originals, then adds game-specific patches and a PC frontend.
+
+> This fork adds a native **Linux** version (an AppImage, no Wine / Proton needed) to
+> [Darhkfox's original](https://github.com/Darhkfox/MickeyAndDonaldCollection). The Linux-specific parts live in
+> `linux/` (see [linux/README.md](linux/README.md)); everything else follows upstream.
 
 ## Getting started
 
@@ -53,6 +57,19 @@ rewind when those are switched on. A Bluetooth or USB controller works too (Xbox
 others, by button position), and hides them; the Back gesture or button opens the pause menu. Menus, the
 launcher and the music player work by tapping and dragging. The first start picks the widest widescreen mode
 that fits the screen (2:1 on most phones).
+
+**On Linux** (x86-64, glibc 2.35 or later: Ubuntu 22.04, Debian 12, Fedora 36, Steam Deck and newer; X11 or
+Wayland, with OpenGL ES 3.0 from Mesa or the NVIDIA driver):
+1. Download the `.AppImage` from the [continuous release](https://github.com/ricardo-duarte-av/MickeyAndDonaldCollection-linux/releases/tag/continuous)
+   (the latest build, updated on every change) and make it executable: `chmod +x Mickey_Donald_Collection-*.AppImage`
+   (or *Properties → Allow executing as program* in a file manager).
+2. Put the ROMs next to the AppImage, or in a `roms` folder beside it (or in
+   `~/.local/share/mickey-donald-collection/roms`).
+3. Run the AppImage. It opens in a window; F11 or Alt+Enter switches to fullscreen. `--game coi` / `qs` / `woi`
+   starts a game directly, as on Windows.
+
+Everything else works as on Windows, except the slang shader presets, the monitor picker and High Frame Rate,
+which are Windows-only.
 
 ## Features
 
@@ -121,6 +138,7 @@ that fits the screen (2:1 on most phones).
   included: you supply them.
 - Windows: drop the pack's folder, as downloaded, into a `soundtracks` folder next to `DisneyClassics.exe`.
   Android: *Options → Audio → Add Soundtrack…* and pick the pack's folder (it is copied into the app).
+  Linux: drop the pack's folder into `~/.local/share/mickey-donald-collection/soundtracks`.
   The folder's name doesn't matter: the patch says which game it is for.
 - Choose it per game under *Options → Audio → Soundtracks*; it starts with the game (or *Reset Game*). The
   patch is applied in memory (the ROM file is never changed), the game's sound effects stay the console's,
@@ -215,6 +233,9 @@ screenshots in `screenshots\`; soundtrack packs go in `soundtracks\`, launcher p
 next to the exe (the folder is portable), or in `%LOCALAPPDATA%\Mickey and Donald Collection` if that
 folder isn't writable. Delete `settings.ini` to restore the defaults.
 
+On Linux they all live in `~/.local/share/mickey-donald-collection` (`$XDG_DATA_HOME/mickey-donald-collection`
+when that is set), with `/` in place of `\`.
+
 ## Building from source
 
 Requirements: Windows 10/11, Visual Studio 2022 (or the Build Tools) with the C++ workload, CMake 3.20+.
@@ -248,6 +269,22 @@ The APK ends up in `android/app/build/outputs/apk/`. Release builds are signed w
 (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) and its keystore are present; both stay out of git.
 A log line every 5 seconds gives the frame rate and the work per frame (`adb logcat | findstr fps`).
 
+### Linux
+
+The Linux build (`linux/`) compiles the shared code and the Android build's SDL2 + OpenGL ES 3.0 layer
+unchanged, with its own window / files layer and stb_truetype for the UI text. On Debian / Ubuntu:
+
+```
+sudo apt install build-essential cmake ninja-build pkg-config libsdl2-dev libgles-dev libegl-dev fonts-dejavu-core
+cmake -S linux -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/linux                         # build/linux/bin/DisneyClassics
+./linux/appimage/build.sh                         # dist/Mickey_Donald_Collection-<version>-x86_64.AppImage
+```
+
+GitHub Actions (`.github/workflows/linux-appimage.yml`) builds and smoke-tests the AppImage on every push and
+publishes it to the *continuous* release; a pushed `v*` tag gets a release of its own. See
+[linux/README.md](linux/README.md).
+
 ### Source layout
 
 | Path | Contents |
@@ -257,6 +294,7 @@ A log line every 5 seconds gives the frame rate and the work per frame (`adb log
 | `src/app/` | Launcher, sessions, menus, music player / sound test, rewind, settings, ROM finder (`romfind.cpp`, `unzip.cpp`), PNG writer, touch controls (`touch.cpp`); per platform: `app_win.cpp` / `app_android.cpp` (window, main loop) and `sys_win.cpp` / `sys_android.cpp` (files, folders, links) |
 | `src/platform/` | Windows: Direct3D 11 video and DirectWrite UI text, XAudio2 audio, keyboard / XInput / DirectInput input. `android/`: OpenGL ES 3.0 video (the same filters as GLSL; UI text from Android's own fonts), SDL audio and controllers |
 | `android/` | Gradle project; `MDActivity.java` adds the ROM picker and the UI font rasteriser to SDL's activity |
+| `linux/` | Linux build: CMake project, `app_linux.cpp` / `sys_linux.cpp` (window, main loop, files), the UI font rasteriser (stb_truetype) behind a stand-in `jni.h`, and the AppImage script |
 | `src/tools/mdtool.cpp`, `tools/mdt.py` | Headless core as a DLL with a Python wrapper, used for all the reverse engineering and testing |
 | `tools/m68dis.py` | 68000 disassembler (capstone) used during development |
 | `tools/re/` | Reverse-engineering scripts behind the notes in `docs/` |
@@ -353,6 +391,9 @@ A log line every 5 seconds gives the frame rate and the work per frame (`adb log
 - Cover pictures are read with stb_image by Sean Barrett, public domain (`third_party/stb`).
 - The Android build uses SDL2 by Sam Lantinga and contributors, zlib licence (fetched by
   `android/fetch_sdl.ps1`, not stored in this repository).
+- The Linux build uses SDL2 too (built from source by `linux/appimage/build.sh` and bundled in the AppImage),
+  stb_truetype by Sean Barrett, public domain (`linux/third_party`), and DejaVu Sans for the UI text (bundled
+  in the AppImage; Bitstream Vera / DejaVu licence).
 - Slang shaders run through librashader by Ronny Chan (chyyran), Mozilla Public License 2.0
   (`librashader-LICENSE.md` next to the exe). The bundled presets are unmodified files from the libretro
   slang-shaders collection, each with its own licence (public domain, GPL v2 or later, MIT): see

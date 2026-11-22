@@ -33,8 +33,9 @@ export go to `~/.local/share/mickey-donald-collection` (`$XDG_DATA_HOME` if set)
 You need OpenGL ES 3.0, which Mesa (Intel, AMD, nouveau) and the NVIDIA driver both provide on X11 and Wayland.
 `./…AppImage --game coi` (or `qs`, `woi`) starts a game directly.
 
-Not available on Linux (Windows-only upstream): slang shader presets (librashader's Direct3D 11 runtime), the
-monitor picker (the window manager places the window) and trailer recording.
+Not available on Linux (Windows-only upstream): slang shader presets (librashader's Direct3D 11 runtime), High
+Frame Rate (its menu item is Windows-only), the monitor picker (the window manager places the window) and trailer
+recording.
 
 ## Building
 
