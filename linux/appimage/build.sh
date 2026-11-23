@@ -78,8 +78,21 @@ export OUTPUT="Mickey_Donald_Collection-$VERSION-$ARCH.AppImage"
 mkdir -p "$ROOT/dist"
 cd "$ROOT/dist"
 # (--appimage-extract-and-run: works without FUSE, as on CI runners and in containers)
-"$LINUXDEPLOY" --appimage-extract-and-run --appdir "$APPDIR" \
-    --desktop-file "$APPDIR/usr/share/applications/mickey-donald-collection.desktop" \
-    --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/mickey-donald-collection.png" \
-    --output appimage
+# The OpenGL / EGL / GLES libraries must come from the player's system: they are thin glvnd dispatchers tied to the
+# system's libGLdispatch and GPU driver, and a bundled copy that doesn't match them makes every GL call fail
+# ("video: shaders failed"). linuxdeploy's own exclude list misses libGLESv2.
+DEPLOY=("$LINUXDEPLOY" --appimage-extract-and-run --appdir "$APPDIR"
+    --desktop-file "$APPDIR/usr/share/applications/mickey-donald-collection.desktop"
+    --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/mickey-donald-collection.png"
+    --exclude-library 'libGLESv2.so*' --exclude-library 'libGLESv1_CM.so*' --exclude-library 'libEGL.so*'
+    --exclude-library 'libGL.so*' --exclude-library 'libGLX.so*' --exclude-library 'libOpenGL.so*'
+    --exclude-library 'libGLdispatch.so*')
+"${DEPLOY[@]}"
+bad="$(find "$APPDIR" -name 'libGL*.so*' -o -name 'libEGL*.so*' -o -name 'libOpenGL*.so*' -o -name 'libGLdispatch*.so*')"
+if [[ -n "$bad" ]]; then
+    echo "error: GL libraries were bundled (they must come from the system):" >&2
+    echo "$bad" >&2
+    exit 1
+fi
+"${DEPLOY[@]}" --output appimage
 echo "AppImage: $ROOT/dist/$OUTPUT"
