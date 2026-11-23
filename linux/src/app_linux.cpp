@@ -4,6 +4,7 @@
 #include "app/app.h"
 #include "platform/android/sdl_keys.h"
 #include <SDL.h>
+#include <GLES3/gl3.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -69,7 +70,19 @@ int App::run() {
     SDL_SetWindowMinimumSize(window_, 480, 300);
     int w = 0, h = 0;
     SDL_GL_GetDrawableSize(window_, &w, &h);
-    if (!video_.init(window_, w, h)) {
+    const bool video_ok = video_.init(window_, w, h);
+    {
+        // One line for bug reports: which display server and GL driver this is running on.
+        const char* drv = SDL_GetCurrentVideoDriver();
+        const char *ver = nullptr, *ren = nullptr;
+        if (SDL_GL_GetCurrentContext()) {
+            ver = (const char*)glGetString(GL_VERSION);
+            ren = (const char*)glGetString(GL_RENDERER);
+        }
+        fprintf(stderr, "MickeyDonald: video driver %s, GL %s, renderer %s\n", drv ? drv : "?", ver ? ver : "(none)",
+                ren ? ren : "(none)");
+    }
+    if (!video_ok) {
         fprintf(stderr, "OpenGL ES 3.0 could not be started: %s\n", SDL_GetError());
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kTitle, "OpenGL ES 3.0 could not be started.", window_);
         return 1;
